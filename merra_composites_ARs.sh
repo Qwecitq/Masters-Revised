@@ -3,8 +3,8 @@
 # Define the path to your Python script
 python_script="your_script.py"
 
-vb='h'
-typ='h'
+vb='precipitationCal'
+typ='precip'
 
 # Loop over the years from 2000 to 2020
 #for year in {2001..2010}; do
@@ -12,7 +12,7 @@ typ='h'
 #    en_yr=$((year + 1))
     
     # Construct the savepath based on the year
-savepath="./MERRA2_SoCal"
+savepath="./MERRA2"
 algo='cascade_bard_v1'
 #algo='SCAFET'
 #algo='guan_waliser'

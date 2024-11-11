@@ -12,7 +12,7 @@ import dask.array as da
 from numba import njit
 
 
-algorithms = ['gershunov']
+algorithms = ['test']
 print(f'{Color.GREEN} Computing Kmeans cluster for {algorithms[0]}{Color.END}')
 #,'SCAFET','mundhenk_v3','reid250','connect500','gershunov','guan_waliser']
 variables = ['epv','ivt']
@@ -23,7 +23,8 @@ for alx, alg in enumerate(algorithms):
     locals()[f'{alg}_merra'] = collections.defaultdict(list)
     print(f'{Color.PURPLE}{alg.upper()}{Color.END}')
     for vx,vb in enumerate(variables):
-        pths = glob.glob(f'{mpath}conus_ARS_DJF_comps_{alg}_{vb}_raw/*.nc',recursive=True)
+        #pths = glob.glob(f'{mpath}conus_ARS_DJF_comps_{alg}_{vb}_raw/*.nc',recursive=True)
+        pths = glob.glob(f'{mpath}test_{vb}/*.nc',recursive=True)   #used this for the test to see if the kmeans is working as it should
         print(len(pths))
         pths.sort()
         #ds = [xr.open_dataset(pt, chunks='auto') for pt in pths]
@@ -48,7 +49,7 @@ scaler = StandardScaler()
 # I first concat along the longitude or latitude (based on which transects), then collapse the lon and lat di-  #
 # mensions. This gives an array index of ntime, 2*lon*lat. I do this in the next 2 lines of code                      #
 ####################################################################################
-data1= eval(f'{alg}_merra')['epv']['EPV'].sel(lev=500)
+data1= eval(f'{alg}_merra')['epv']['EPV']#.sel(lev=500)
 data2 =eval(f'{alg}_merra')['ivt']['IVT']
 new_data = xr.concat([data1,data2],dim=['lat','lon']) #reshape using this! More memory efficient
 #new_data = np.reshape(trans_data.values,(len(trans_data.time.values),len(trans_data.level)*len(trans_data[tloc].values)))
@@ -59,7 +60,7 @@ new_data = new_data.stack(lev_lat=('lon','lat','concat_dim')).transpose('time', 
 print(len(new_data.time.values))
 print('Scaling data')
 print('Using numpy to scale')
-num_of_splits = 55
+num_of_splits = 2
 dividend = np.floor_divide(len(new_data.time.values),num_of_splits)
 
 #set the dividend for dividing the dataset into pieces for making the scaling easier on memory 

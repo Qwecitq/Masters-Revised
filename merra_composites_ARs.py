@@ -77,6 +77,14 @@ elif typ == 'ivt':
     dpths.sort()
     lon_name = 'lon'
     lat_name = 'lat'
+
+elif typ=='precip':
+    mpath=f'/global/cfs/projectdirs/m4374/catalogues/raw_catalogue_files/observations/PFs_category/20*/MERGED_FP/GPM*.nc'
+    dpths = glob.glob(f'{mpath}', recursive=True)
+    dpths.sort()
+    #print(dpths)
+    lon_name = 'longitude'
+    lat_name = 'latitude'
     
 print(mpath)
 
@@ -92,174 +100,183 @@ if os.path.isdir(final_path)==False:
     
 def process_year(r):
     
-    try:
-        #for r in tqdm(range(int(start_yr),int(end_yr)),desc='Years Completed'):
-        formal_path=f'SoCal/conus_ARS_{algo}/'
-        file_path = f'{formal_path}random_locations.txt'
+    #try:
+    #for r in tqdm(range(int(start_yr),int(end_yr)),desc='Years Completed'):
+    formal_path=f'conus_ARS_{algo}/'
+    file_path = f'{formal_path}random_locations.txt'
 
-        # Read the file and extract coordinates
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
+    # Read the file and extract coordinates
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
 
-        coordinates = [ast.literal_eval(line.strip()) for line in lines]
+    coordinates = [ast.literal_eval(line.strip()) for line in lines]
 
-        # Convert coordinates to floats
-        float_coordinates = [(float(lat), float(lon)) for lon, lat in coordinates]
-        if vb != 'ivt':
-            dp = [a for a in dpths if f'.{str(r)}' in a]            #data paths specific to the selected year
-        elif vb == 'ivt':
-            dp = [a for a in dpths if f'{str(r)}' in a]            #data paths specific to the selected year
-        print(len(dp))
-        ds = [xr.open_dataset(a, chunks='auto') for a in tqdm(dp, desc=f'Loading Data for {r}')]
-        print('Concatenating Data ...')
+    # Convert coordinates to floats
+    float_coordinates = [(float(lat), float(lon)) for lon, lat in coordinates]
+    if vb != 'ivt':
+        dp = [a for a in dpths if f'.{str(r)}' in a]            #data paths specific to the selected year
+    elif vb == 'ivt':
+        dp = [a for a in dpths if f'{str(r)}' in a]            #data paths specific to the selected year
+    if vb =='precipitationCal':
+        dp =  [a for a in dpths if f'/{str(r)}/' in a]  
+    #print(dp)
+        
+    ds = [xr.open_dataset(a, chunks='auto') for a in tqdm(dp, desc=f'Loading Data for {r}')]
+    print('Concatenating Data ...')
 
-        ds = xr.concat(ds, dim='time').drop_duplicates(dim='time')
-        #clim_pths = glob.glob(f'../SWA_work/climatologies_1980-2020/clim_{vb}*',recursive=True)        #load climatologies 
-        if vb == 'ivt' or vb == 'tqv':
-            ds[vb.upper()] = ds[vb]
-        if typ == 'levels' or typ== 'pot':
+    ds = xr.concat(ds, dim='time').drop_duplicates(dim='time')
+    print(ds)
+    #clim_pths = glob.glob(f'../SWA_work/climatologies_1980-2020/clim_{vb}*',recursive=True)        #load climatologies 
+    if vb == 'ivt' or vb == 'tqv' or vb == 'precipitationCal':
+        ds[vb.upper()] = ds[vb]
+    if typ == 'levels' or typ== 'pot':
 
-            ds = ds[vb.upper()].sel(level=[850,700,500,300,250])  #I have selected only the 500 and 250hpa 
-        else: 
+        ds = ds[vb.upper()].sel(level=[850,700,500,300,250])  #I have selected only the 500 and 250hpa 
+    else: 
 
-            ds = ds[vb.upper()] 
-        counter = 0
+        ds = ds[vb.upper()] 
+    counter = 0
 
-        data_to_save = []
-        for rn_loc in float_coordinates:
+    data_to_save = []
+    for rn_loc in float_coordinates:
 
-            #remember ix is lon and iy is lat 
-            ix = rn_loc[0]
-            iy = rn_loc[1]
+        #remember ix is lon and iy is lat 
+        ix = rn_loc[0]
+        iy = rn_loc[1]
 
-            #remember that in naming the text timesteps, there was a swap mistake in lon and lat in the name
-            times_to_sel= open(f'{formal_path}ARS_lf_{iy}E_{ix}N_1980-2020_full.txt','r')   #open text data generated from LPS_MCS_lf_ts_saver.sh
-            times_to_sel = times_to_sel.readlines()    #read data into a variable 
-            ti_lo_la = [t.split('\n')[0] for t in times_to_sel]
-
-
-
-            ts = [t for t in ti_lo_la if str(r) in t ]               # data times specific to the selected year for the LPS_MCS co-occurrence
-            print(ts)
-            times,lons,lats = [], [], []
-            #no_time = []
-
-            #obtain the times and coordinates for the dataset
-            for d in ts:
-                dd = d.split(',')
-                print(dd)
-                if len(dd[0]) > 3:
-                    times.append(dd[0])
+        #remember that in naming the text timesteps, there was a swap mistake in lon and lat in the name
+        times_to_sel= open(f'{formal_path}ARS_lf_{iy}E_{ix}N_1980-2020_full.txt','r')   #open text data generated from LPS_MCS_lf_ts_saver.sh
+        times_to_sel = times_to_sel.readlines()    #read data into a variable 
+        ti_lo_la = [t.split('\n')[0] for t in times_to_sel]
 
 
-            #ts = ts[~ts.duplicated()]
-            print(f'{times}')
-            #print(f'Loading data for {r}')
+
+        ts = [t for t in ti_lo_la if str(r) in t ]               # data times specific to the selected year for the LPS_MCS co-occurrence
+        print(ts)
+        times,lons,lats = [], [], []
+        #no_time = []
+
+        #obtain the times and coordinates for the dataset
+        for d in ts:
+            dd = d.split(',')
+            print(dd)
+            if len(dd[0]) > 3:
+                times.append(dd[0])
 
 
-            times.sort()
-            #select times from dataset 
-            new_ds = ds.sortby('time').sel(time=times,method='nearest')
+        #ts = ts[~ts.duplicated()]
+        print(f'{times}')
+        #print(f'Loading data for {r}')
 
-            #convert data lons from 0-360 to -180-180
-            #new_ds.coords[lon_name] = (new_ds.coords[lon_name]  + 180) % 360 - 180 #convert from 0-360 to -180 to 180
-            #new_ds = new_ds.sortby(new_ds.lon) #sort the lons
 
-            #Convert lons (ix) into -180 to 180
-            ix = (ix + 180)% 360 - 180
+        times.sort()
+        #select times from dataset 
+        new_ds = ds.sortby('time').sel(time=times,method='nearest')
 
-            ######################################################################################
-            ########################## CREATE SUPERIMPOSED POSITION DATASET ###################
-            ######################################################################################
+        #convert data lons from 0-360 to -180-180
+        new_ds.coords[lon_name] = (new_ds.coords[lon_name]  + 180) % 360 - 180 #convert from 0-360 to -180 to 180
+        new_ds = new_ds.sortby(new_ds[lon_name]) #sort the lons
 
-            sup_imposed_ds = []
-            #set the distance from the center of the landfall point
-            ln_dist = 25   #in degrees
-            lt_dist = 15   #in degrees
+        #Convert lons (ix) into -180 to 180
+        ix = (ix + 180)% 360 - 180
+        print(new_ds.longitude.values)
+        ######################################################################################
+        ########################## CREATE SUPERIMPOSED POSITION DATASET ###################
+        ######################################################################################
 
-            if vb != 'tqv':
-                _nds = new_ds.sel(lon=slice(ix - ln_dist, ix + ln_dist), 
-                             lat = slice(iy - lt_dist, iy + lt_dist))
-            elif vb == 'tqv':
-                _nds = new_ds.sel(longitude=slice(ix - ln_dist, ix + ln_dist), 
-                             latitude = slice(iy - lt_dist, iy + lt_dist))
+        sup_imposed_ds = []
+        #set the distance from the center of the landfall point
+        ln_dist = 25   #in degrees
+        lt_dist = 15   #in degrees
 
-            print(_nds)
-            #for ln,lt,tms in zip(lons,lats):
-                #for a specific time, select the data such that, ln,lt is the center of the data 
-             #   _nds = ds.sel(time=times).sel(lon=slice(ln-ln_dist, ln+ln_dist), lat=slice(lt+lt_dist, lt-lt_dist))
-                #_clm = clim_ds.sel(lon=slice(ln-ln_dist, ln+ln_dist), lat=slice(lt+lt_dist, lt-lt_dist))
+        if vb == 'precipitationCal':
+            _nds = new_ds.sel(longitude=slice( ix - ln_dist,  ix + ln_dist), 
+                         latitude = slice(iy - lt_dist, iy + lt_dist))
+            
+        # if vb != 'tqv' or vb !='precipitationCal':
+        #     _nds = new_ds.sel(lon=slice(ix - ln_dist, ix + ln_dist), 
+        #                  lat = slice(iy - lt_dist, iy + lt_dist))
+        elif vb == 'tqv':
+            _nds = new_ds.sel(longitude=slice(ix - ln_dist, ix + ln_dist), 
+                         latitude = slice(iy - lt_dist, iy + lt_dist))
+        
 
-                #_nds = _nds - _clm
-            lon_data_resolution = abs(_nds[lon_name][0].values - _nds[lon_name][1].values) ; print(lon_data_resolution)#0.625   #for MERRA2
-            lat_data_resolution =  abs(_nds[lat_name][0].values - _nds[lat_name][1].values) ; print(lat_data_resolution)
-            #set new lon and lat values to the dataset
-            lon_range = np.arange(-ln_dist,ln_dist+0.1, lon_data_resolution)
-            lat_range = np.arange(-lt_dist, lt_dist+0.1, lat_data_resolution)
+        print(_nds)
+        #for ln,lt,tms in zip(lons,lats):
+            #for a specific time, select the data such that, ln,lt is the center of the data 
+         #   _nds = ds.sel(time=times).sel(lon=slice(ln-ln_dist, ln+ln_dist), lat=slice(lt+lt_dist, lt-lt_dist))
+            #_clm = clim_ds.sel(lon=slice(ln-ln_dist, ln+ln_dist), lat=slice(lt+lt_dist, lt-lt_dist))
 
-            print(lon_range)
-            print(lat_range)
+            #_nds = _nds - _clm
+        lon_data_resolution = abs(_nds[lon_name][0].values - _nds[lon_name][1].values) ; print(lon_data_resolution)#0.625   #for MERRA2
+        lat_data_resolution =  abs(_nds[lat_name][0].values - _nds[lat_name][1].values) ; print(lat_data_resolution)
+        #set new lon and lat values to the dataset
+        lon_range = np.arange(-ln_dist,ln_dist+0.1, lon_data_resolution)
+        lat_range = np.arange(-lt_dist, lt_dist+0.1, lat_data_resolution)
 
-            time_range = np.arange(counter,counter+len(times),1)
+        print(lon_range)
+        print(lat_range)
 
-            counter = counter + len(times)
+        time_range = np.arange(counter,counter+len(times),1)
 
-            #reassign new lons and lats to the dataset 
-            _nds[lat_name] = lat_range[:len(_nds[lat_name].values)] ; _nds[lon_name] = lon_range[:len(_nds[lon_name].values)]   ; _nds['time'] = time_range
+        counter = counter + len(times)
 
-            #append dataset to list 
-            data_to_save.append(_nds.sortby(lon_name))
-            #ds = ds.sel(lon=slice(-20,20),lat=slice(20,0))
-        print(f'{Color.RED}{data_to_save[0]}{Color.END}')
-        new_dataset = xr.Dataset()
+        #reassign new lons and lats to the dataset 
+        _nds[lat_name] = lat_range[:len(_nds[lat_name].values)] ; _nds[lon_name] = lon_range[:len(_nds[lon_name].values)]   ; _nds['time'] = time_range
 
-        new_dataset[vb.upper()] = xr.concat([x for x in data_to_save if len(x.time)> 0 ],dim='time' )
-        time_range = pd.date_range(str(r),periods=len(new_dataset.time.values), freq='1H')
-        new_dataset['time'] = time_range 
-        new_dataset.chunk({'time':6})
+        #append dataset to list 
+        data_to_save.append(_nds.sortby(lon_name))
+        #ds = ds.sel(lon=slice(-20,20),lat=slice(20,0))
+    print(f'{Color.RED}{data_to_save[0]}{Color.END}')
+    new_dataset = xr.Dataset()
 
-        enc_dict = {'zlib': True, 'complevel': 1, 'fletcher32': True}
-        vbs = [list(new_dataset.variables)[0]]
-        enc = {i: enc_dict for i in vbs}
+    new_dataset[vb.upper()] = xr.concat([x for x in data_to_save if len(x.time)> 0 ],dim='time' )
+    time_range = pd.date_range(str(r),periods=len(new_dataset.time.values), freq='1H')
+    new_dataset['time'] = time_range 
+    new_dataset.chunk({'time':6})
 
-        new_dataset = new_dataset.load()
+    enc_dict = {'zlib': True, 'complevel': 1, 'fletcher32': True}
+    vbs = [list(new_dataset.variables)[0]]
+    enc = {i: enc_dict for i in vbs}
 
-        if algo == 'g' or algo=='S':
-            # Get the total number of time steps
-            total_time_steps = len(new_dataset.time)
+    new_dataset = new_dataset.load()
 
-            # Define the indices for the three subsets
-            subset1_indices = slice(0, total_time_steps // 3)
-            subset2_indices = slice(total_time_steps // 3, 2 * (total_time_steps // 3))
-            subset3_indices = slice(2 * (total_time_steps // 3), total_time_steps)
+    if algo == 'g' or algo=='S':
+        # Get the total number of time steps
+        total_time_steps = len(new_dataset.time)
 
-            # Create three subsets
-            subset1 = ds.isel(time=subset1_indices)
-            subset2 = ds.isel(time=subset2_indices)
-            subset3 = ds.isel(time=subset3_indices)
+        # Define the indices for the three subsets
+        subset1_indices = slice(0, total_time_steps // 3)
+        subset2_indices = slice(total_time_steps // 3, 2 * (total_time_steps // 3))
+        subset3_indices = slice(2 * (total_time_steps // 3), total_time_steps)
 
-            sub_list = [subset1,subset2,subset3]
+        # Create three subsets
+        subset1 = ds.isel(time=subset1_indices)
+        subset2 = ds.isel(time=subset2_indices)
+        subset3 = ds.isel(time=subset3_indices)
 
-            sub_len = np.arange(0,len(sub_list))
+        sub_list = [subset1,subset2,subset3]
 
-            saving = [x.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}_{ix}.nc',encoding=enc) for ix,x in enumerate(sub_list)]
-            #subset1.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
-            #subset2.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
-            #subset3.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
-        else:
-            new_dataset.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
-        #saver.ch_paths(new_dataset, f'{final_path}',f'ARS_supperimposed_',vbs,counter=counter,sv_data_times='False')
-        print(f'{Color.BLUE} Done with {r} for {algo}...{Color.END}')
+        sub_len = np.arange(0,len(sub_list))
 
-    except:
-        pass
+        saving = [x.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}_{ix}.nc',encoding=enc) for ix,x in enumerate(sub_list)]
+        #subset1.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
+        #subset2.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
+        #subset3.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
+    else:
+        new_dataset.to_netcdf(f'{final_path}ARS_supperimposed_{vb}_{r}_{algo}.nc',encoding=enc)
+    #saver.ch_paths(new_dataset, f'{final_path}',f'ARS_supperimposed_',vbs,counter=counter,sv_data_times='False')
+    print(f'{Color.BLUE} Done with {r} for {algo}...{Color.END}')
+
+    #except:
+    #   pass
 def run_process_year_and_store_results(year):
     process_year(year)
 
 def main():
     # Set the range of years you want to process
-    start_year = 2010
-    end_year =  2018
+    start_year = 2001
+    end_year =  2017
 
     # Create a pool of processes
     pool = multiprocessing.Pool()
